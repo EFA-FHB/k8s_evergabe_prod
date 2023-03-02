@@ -1,0 +1,253 @@
+apiVersion: v1
+data:
+  APP_API_DELIVERIES_MAXIMUM_EFORMS_SIZE: "500"
+  APP_CRON_JOBS_CREATE_NOTICES: "off"
+  APP_CRON_JOBS_CREATE_REPORTS: "off"
+  APP_CRON_JOBS_GET_TRANSACTIONS: "off"
+  APP_CRON_JOBS_MARK_AS_DOWNLOADED: "off"
+  APP_CRON_JOBS_PROCESS_NPR: "off"
+  APP_CRON_JOBS_REPORTING_DELETION_INTERVAL: "off"
+  APP_CRON_JOBS_REQUEST_STATUS: "off"
+  APP_CRON_JOBS_SEND_REPORTS: "off"
+  APP_CRON_JOBS_TENANT_CLEANUP: "off"
+  APP_CRON_JOBS_TRANSFER_NOTICES: "off"
+  APP_DATASOURCE_JDBC_URL: jdbc:postgresql://172.16.68.47:5432/bkms-mediator
+  APP_EMAIL_SERVER_DEBUG: "false"
+  APP_EMAIL_SERVER_FROM: hb-interim@ongisa.de
+  APP_EMAIL_SERVER_HOST: mailgw-auth.ongisa.de
+  APP_EMAIL_SERVER_MOCK: "false"
+  APP_EMAIL_SERVER_PORT: "25"
+  APP_EMAIL_SERVER_SSL: "false"
+  APP_EMAIL_SERVER_TRUST_ALL: "true"
+  APP_LOG_CATEGORY__COM_NORTAL__LEVEL: INFO
+  APP_LOG_CONSOLE_JSON: "true"
+  APP_LOG_MIN_LEVEL: DEBUG
+  APP_OIDC_BASE_URL: http://keycloak-svc:8080
+  APP_OIDC_REALM_NAME: evergabe
+  APP_PEPPOL_ROUTING_RECEIVER_ID: 0204:994-BKMS-22
+  APP_TRANSFER_BKMS_BASE_URL: https://oeffentlichevergabe.de
+  APP_TRANSFER_ESENDER_DELIVERY_URL: http://esender-app-svc:8080/v1/notices
+  APP_TRANSFER_PEPPOL_BASE_URL: https://ws-staging.b2brouter.com/api/v1
+  APP_TRANSFER_TRANSPORT: REST
+  JAVA_OPTS_APPEND: -Dfile.encoding=UTF-8 -Xmx2560M -Xms1024M -Dhttps.proxyHost=185.158.227.174
+    -Dhttps.proxyPort=8090
+  JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Xmx2560M -Xms1024M -Dhttps.proxyHost=185.158.227.174
+    -Dhttps.proxyPort=8090
+kind: ConfigMap
+metadata:
+  labels:
+    app: bkms-mediator-app
+  name: bkms-mediator-app-configmap
+  namespace: hb-nortal
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: bkms-mediator-app
+  name: bkms-mediator-app-svc
+  namespace: hb-nortal
+spec:
+  ports:
+  - name: 8080-tcp
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: bkms-mediator-app
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: bkms-mediator-app
+  name: bkms-mediator-app-deployment
+  namespace: hb-nortal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bkms-mediator-app
+  template:
+    metadata:
+      labels:
+        app: bkms-mediator-app
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - env:
+        - name: APP_KEYCLOAK_USER_MANAGER_USERNAME_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: bkms-mediator-oidc-admin-creds
+        - name: APP_KEYCLOAK_USER_MANAGER_PASSWORD_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: bkms-mediator-oidc-admin-creds
+        - name: APP_KEYCLOAK_TENANT_PASSWORD_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: default_password
+              name: bkms-mediator-oidc-tenant-default-creds
+        - name: APP_OIDC_ESENDER_CLIENT_ID_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client_id
+              name: esender-oidc-client-secret
+        - name: APP_OIDC_ESENDER_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client_secret
+              name: esender-oidc-client-secret
+        - name: APP_OIDC_ESENDER_USER_USERNAME_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: esender-oidc-user-creds
+        - name: APP_OIDC_ESENDER_USER_PASSWORD_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: esender-oidc-user-creds
+        - name: APP_OIDC_MEDIATOR_CLIENT_ID_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client_id
+              name: bkms-mediator-oidc-client-secret
+        - name: APP_OIDC_MEDIATOR_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: client_secret
+              name: bkms-mediator-oidc-client-secret
+        - name: APP_DATASOURCE_USERNAME_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: datasource_username
+              name: bkms-mediator-app-secret
+        - name: APP_DATASOURCE_PASSWORD_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: datasource_password
+              name: bkms-mediator-app-secret
+        - name: APP_EMAIL_SERVER_USERNAME_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: email_username
+              name: bkms-mediator-app-secret
+        - name: APP_EMAIL_SERVER_PASSWORD_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: email_password
+              name: bkms-mediator-app-secret
+        - name: APP_TRANSFER_PEPPOL_TOKEN_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: api_token
+              name: bkms-mediator-app-secret-b2brouter
+        - name: POD
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: DIAGNOSTICS_PATH
+          value: /var/run/diagnostics
+        envFrom:
+        - configMapRef:
+            name: bkms-mediator-app-configmap
+        image: registry.k8s-schuetze-05.gisaservices.intern:30355/bkms-mediator-app:3.0.1-1692
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health/check
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 90
+          timeoutSeconds: 5
+        name: bkms-mediator
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health/ready
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 20
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 500m
+            memory: 2560M
+          requests:
+            cpu: 200m
+            memory: 1024M
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - all
+          readOnlyRootFilesystem: true
+          runAsGroup: 12000
+          runAsNonRoot: true
+          runAsUser: 185
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /var/run/diagnostics
+          name: heapdump-volume
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - emptyDir: {}
+        name: tmp
+      - name: heapdump-volume
+        persistentVolumeClaim:
+          claimName: heapdump-pvc
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/app-root: /q/swagger-ui/
+  labels:
+    app: bkms-mediator-app
+  name: bkms-mediator-app-ingress
+  namespace: hb-nortal
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: evergabe.hb-interim.gisa.de
+    http:
+      paths:
+      - backend:
+          service:
+            name: bkms-mediator-app-svc
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  - host: ozg-vermittlungsdienst.de
+    http:
+      paths:
+      - backend:
+          service:
+            name: bkms-mediator-app-svc
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - evergabe.hb-interim.gisa.de
+    - ozg-vermittlungsdienst.de

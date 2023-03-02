@@ -1,0 +1,76 @@
+apiVersion: v1
+data:
+  CONTEXTS: default
+  DB_HOST: 172.16.68.47
+  DB_NAME: bkms-mediator
+  DB_PORT: "5432"
+kind: ConfigMap
+metadata:
+  labels:
+    app: bkms-mediator-schema
+  name: bkms-mediator-schema-configmap
+  namespace: hb-nortal
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    app: bkms-mediator-schema
+  name: bkms-mediator-schema-db-patch
+  namespace: hb-nortal
+spec:
+  backoffLimit: 1
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        app: bkms-mediator-schema
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - env:
+        - name: DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: DB_HOST
+              name: bkms-mediator-schema-configmap
+        - name: DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              key: DB_PORT
+              name: bkms-mediator-schema-configmap
+        - name: DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              key: DB_NAME
+              name: bkms-mediator-schema-configmap
+        - name: CONTEXTS
+          valueFrom:
+            configMapKeyRef:
+              key: CONTEXTS
+              name: bkms-mediator-schema-configmap
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: bkms-mediator-schema-secret
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: bkms-mediator-schema-secret
+        image: registry.k8s-schuetze-05.gisaservices.intern:30355/bkms-mediator-schema:3.0.1-1692
+        imagePullPolicy: Always
+        name: bkms-mediator-schema
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - all
+          readOnlyRootFilesystem: true
+          runAsGroup: 12000
+          runAsNonRoot: true
+          runAsUser: 1000055000
+      dnsPolicy: ClusterFirst
+      restartPolicy: Never
